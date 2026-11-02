@@ -3408,6 +3408,7 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 		model                    string
 		effort                   *string
 		maxTokens                *int
+		maxCompletionTokens      *int
 		expectedFieldName        string
 		expectedType             string
 		expectBudgetTokens       bool
@@ -3423,6 +3424,19 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 			expectBudgetTokens:       false,
 			expectNoOutputConfig:     false,
 			expectOutputConfigEffort: "high",
+		},
+		{
+			// A budget below the 1024 minimum would fail the conversion, so a
+			// small max_tokens proves Haiku 5.5 takes the adaptive path.
+			name:                     "Haiku5.5_AdaptiveThinking_SmallMaxTokens",
+			model:                    "eu.anthropic.claude-haiku-5-5",
+			effort:                   schemas.Ptr("low"),
+			maxCompletionTokens:      schemas.Ptr(256),
+			expectedFieldName:        "thinking",
+			expectedType:             "adaptive",
+			expectBudgetTokens:       false,
+			expectNoOutputConfig:     false,
+			expectOutputConfigEffort: "low",
 		},
 		{
 			name:                 "Opus4.5_NativeEffort_UsesThinkingField",
@@ -3483,7 +3497,8 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 					},
 				},
 				Params: &schemas.ChatParameters{
-					Reasoning: reasoning,
+					Reasoning:           reasoning,
+					MaxCompletionTokens: tt.maxCompletionTokens,
 				},
 			}
 
