@@ -3408,8 +3408,10 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 		model                    string
 		effort                   *string
 		maxTokens                *int
+		display                  *string
 		maxCompletionTokens      *int
 		expectedFieldName        string
+		expectDisplay            string
 		expectedType             string
 		expectBudgetTokens       bool
 		expectNoOutputConfig     bool
@@ -3466,6 +3468,33 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 			expectNoOutputConfig: true,
 		},
 		{
+			// No effort is sent, so the model keeps its own default effort.
+			name:                 "Opus5.5_DisplayOnly_AdaptiveWithoutEffort",
+			model:                "eu.anthropic.claude-opus-5-5",
+			display:              schemas.Ptr("summarized"),
+			expectedFieldName:    "thinking",
+			expectedType:         "adaptive",
+			expectDisplay:        "summarized",
+			expectNoOutputConfig: true,
+		},
+		{
+			name:                 "Sonnet4.6_DisplayOnly_AdaptiveWithoutEffort",
+			model:                "anthropic.claude-sonnet-4-6",
+			display:              schemas.Ptr("omitted"),
+			expectedFieldName:    "thinking",
+			expectedType:         "adaptive",
+			expectDisplay:        "omitted",
+			expectNoOutputConfig: true,
+		},
+		{
+			name:                 "Opus4.5_DisplayOnly_StaysDisabled",
+			model:                "anthropic.claude-opus-4-5-v1",
+			display:              schemas.Ptr("summarized"),
+			expectedFieldName:    "thinking",
+			expectedType:         "disabled",
+			expectNoOutputConfig: true,
+		},
+		{
 			name:                 "Anthropic_DisabledReasoning_UsesThinkingField",
 			model:                "anthropic.claude-3-7-sonnet-v1",
 			effort:               schemas.Ptr("none"),
@@ -3485,6 +3514,7 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 			if tt.maxTokens != nil {
 				reasoning.MaxTokens = tt.maxTokens
 			}
+			reasoning.Display = tt.display
 
 			bifrostReq := &schemas.BifrostChatRequest{
 				Model: tt.model,
@@ -3538,6 +3568,9 @@ func TestAnthropicReasoningConfigUsesThinkingField(t *testing.T) {
 				if tt.expectBudgetTokens {
 					_, hasBudget := configMap["budget_tokens"]
 					assert.True(t, hasBudget, "expected budget_tokens in thinking config")
+				}
+				if tt.expectDisplay != "" {
+					assert.Equal(t, tt.expectDisplay, configMap["display"])
 				}
 			} else if configMap, ok := thinkingConfig.(map[string]string); ok {
 				assert.Equal(t, tt.expectedType, configMap["type"])

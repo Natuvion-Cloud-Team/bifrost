@@ -242,6 +242,14 @@ func convertChatParameters(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifr
 
 	// capModel is the canonical model used only for Anthropic capability gating
 	capModel := schemas.ResolveCanonicalModel(ctx, bifrostReq.Model)
+	// Display without an effort or a budget turns adaptive thinking on, and the model
+	// keeps its own default effort.
+	displayOnlyThinking := bifrostReq.Params.Reasoning != nil &&
+		bifrostReq.Params.Reasoning.Display != nil &&
+		bifrostReq.Params.Reasoning.Effort == nil &&
+		bifrostReq.Params.Reasoning.MaxTokens == nil &&
+		schemas.IsAnthropicModelFamily(ctx, bifrostReq.Model) &&
+		anthropic.SupportsAdaptiveThinking(capModel)
 	// Convert inference config
 	if inferenceConfig := convertInferenceConfig(bifrostReq.Params, capModel); inferenceConfig != nil {
 		bedrockReq.InferenceConfig = inferenceConfig
@@ -438,6 +446,11 @@ func convertChatParameters(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifr
 					})
 				}
 			}
+		} else if displayOnlyThinking {
+			bedrockReq.AdditionalModelRequestFields.Set("thinking", map[string]any{
+				"type":    "adaptive",
+				"display": *bifrostReq.Params.Reasoning.Display,
+			})
 		} else {
 			if schemas.IsAnthropicModelFamily(ctx, bifrostReq.Model) {
 				if !anthropic.IsFableFamily(capModel) {
@@ -475,7 +488,7 @@ func convertChatParameters(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifr
 		// and the langchain-aws ChatBedrockConverse implementation at
 		// https://github.com/langchain-ai/langchain-aws/blob/main/libs/aws/langchain_aws/chat_models/bedrock_converse.py
 		// (supports_tool_choice_values), which ships the same model-family gate.
-		thinkingEnabled := bifrostReq.Params.Reasoning != nil &&
+		thinkingEnabled := displayOnlyThinking || bifrostReq.Params.Reasoning != nil &&
 			(bifrostReq.Params.Reasoning.MaxTokens != nil ||
 				(bifrostReq.Params.Reasoning.Effort != nil && *bifrostReq.Params.Reasoning.Effort != "none"))
 		if !schemas.IsLlamaModelFamily(ctx, bifrostReq.Model) && !thinkingEnabled {
