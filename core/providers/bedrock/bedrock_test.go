@@ -385,7 +385,8 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 				},
 			},
 			expected: &bedrock.BedrockConverseRequest{
-				ModelID: "claude-3-sonnet",
+				ModelID:         "claude-3-sonnet",
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				Messages: []bedrock.BedrockMessage{
 					{
 						Role: bedrock.BedrockMessageRoleUser,
@@ -424,7 +425,8 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 				},
 			},
 			expected: &bedrock.BedrockConverseRequest{
-				ModelID: "claude-3-sonnet",
+				ModelID:         "claude-3-sonnet",
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				System: []bedrock.BedrockSystemMessage{
 					{
 						Text: schemas.Ptr("System message 1"),
@@ -512,7 +514,7 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 						},
 					},
 				},
-				InferenceConfig: &bedrock.BedrockInferenceConfig{},
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				ServiceTier: &bedrock.BedrockServiceTier{
 					Type: bedrock.BedrockServiceTierTypePriority,
 				},
@@ -547,6 +549,7 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 					},
 				},
 				InferenceConfig: &bedrock.BedrockInferenceConfig{
+					MaxTokens:   schemas.Ptr(4096),
 					Temperature: &temp,
 				},
 			},
@@ -597,7 +600,7 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 						},
 					},
 				},
-				InferenceConfig: &bedrock.BedrockInferenceConfig{},
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				ToolConfig: &bedrock.BedrockToolConfig{
 					Tools: []bedrock.BedrockTool{
 						{
@@ -666,7 +669,7 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 						},
 					},
 				},
-				InferenceConfig: &bedrock.BedrockInferenceConfig{},
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				GuardrailConfig: &bedrock.BedrockGuardrailConfig{
 					GuardrailIdentifier: "test-guardrail",
 					GuardrailVersion:    "1",
@@ -749,7 +752,8 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 				},
 			},
 			expected: &bedrock.BedrockConverseRequest{
-				ModelID: "claude-3-sonnet",
+				ModelID:         "claude-3-sonnet",
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				Messages: []bedrock.BedrockMessage{
 					{
 						Role: bedrock.BedrockMessageRoleUser,
@@ -851,8 +855,9 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 				Input: []schemas.ChatMessage{},
 			},
 			expected: &bedrock.BedrockConverseRequest{
-				ModelID:  "claude-3-sonnet",
-				Messages: nil,
+				ModelID:         "claude-3-sonnet",
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
+				Messages:        nil,
 			},
 		},
 		{
@@ -965,7 +970,7 @@ func TestBifrostToBedrockRequestConversion(t *testing.T) {
 						},
 					},
 				},
-				InferenceConfig: &bedrock.BedrockInferenceConfig{},
+				InferenceConfig: &bedrock.BedrockInferenceConfig{MaxTokens: schemas.Ptr(4096)},
 				ToolConfig: &bedrock.BedrockToolConfig{
 					Tools: []bedrock.BedrockTool{
 						{
