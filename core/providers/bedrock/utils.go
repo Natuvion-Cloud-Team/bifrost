@@ -940,6 +940,9 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 
 	var contentBlocks []BedrockContentBlock
 
+	// Bedrock accepts a cache point as its own block in the message, not inside
+	// a tool result, so it goes after the last tool result.
+	var cachePoint *BedrockCachePoint
 	for _, msg := range msgs {
 		var toolResultContent []BedrockContentBlock
 		if msg.Content.ContentStr != nil {
@@ -987,11 +990,8 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 						toolResultContent = append(toolResultContent, BedrockContentBlock{
 							Text: block.Text,
 						})
-						// Cache point must be in a separate block
 						if block.CacheControl != nil {
-							toolResultContent = append(toolResultContent, BedrockContentBlock{
-								CachePoint: newBedrockCachePoint(block.CacheControl.TTL),
-							})
+							cachePoint = newBedrockCachePoint(block.CacheControl.TTL)
 						}
 					}
 				case schemas.ChatContentBlockTypeImage:
@@ -1003,11 +1003,8 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 						toolResultContent = append(toolResultContent, BedrockContentBlock{
 							Image: imageSource,
 						})
-						// Cache point must be in a separate block
 						if block.CacheControl != nil {
-							toolResultContent = append(toolResultContent, BedrockContentBlock{
-								CachePoint: newBedrockCachePoint(block.CacheControl.TTL),
-							})
+							cachePoint = newBedrockCachePoint(block.CacheControl.TTL)
 						}
 					}
 				}
@@ -1032,6 +1029,9 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 		}
 
 		contentBlocks = append(contentBlocks, toolResultBlock)
+	}
+	if cachePoint != nil {
+		contentBlocks = append(contentBlocks, BedrockContentBlock{CachePoint: cachePoint})
 	}
 
 	bedrockMsg.Content = contentBlocks
