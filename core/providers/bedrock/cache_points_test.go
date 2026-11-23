@@ -1,7 +1,9 @@
 package bedrock
 
 import (
+	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -316,8 +318,9 @@ func TestBuildBedrockTokenUsage_StreamMatchesNonStream(t *testing.T) {
 }
 
 // TestConvertToolMessages_CachePointAfterToolResults — a cache point on a tool
-// result goes after the last tool result of the message, never inside one:
-// Bedrock ignores a cache point in tool result content.
+// result goes right after that tool result as its own block, never inside it:
+// Bedrock does not accept a cache point in tool result content. Each marker keeps
+// its own position and TTL.
 func TestConvertToolMessages_CachePointAfterToolResults(t *testing.T) {
 	toolCall := func(id string) schemas.ChatAssistantMessageToolCall {
 		return schemas.ChatAssistantMessageToolCall{
@@ -340,18 +343,66 @@ func TestConvertToolMessages_CachePointAfterToolResults(t *testing.T) {
 			}}},
 		}
 	}
-	ephemeral := &schemas.CacheControl{Type: schemas.CacheControlTypeEphemeral}
+	marker := func(ttl string) *schemas.CacheControl {
+		cc := &schemas.CacheControl{Type: schemas.CacheControlTypeEphemeral}
+		if ttl != "" {
+			cc.TTL = schemas.Ptr(ttl)
+		}
+		return cc
+	}
+
+	// layout renders a block as "toolResult:<id>" or "cachePoint" / "cachePoint:<ttl>".
+	layout := func(t *testing.T, blocks []BedrockContentBlock) []string {
+		t.Helper()
+		var got []string
+		for i, block := range blocks {
+			switch {
+			case block.ToolResult != nil:
+				for _, inner := range block.ToolResult.Content {
+					if inner.CachePoint != nil {
+						t.Errorf("block %d: cache point inside tool result content", i)
+					}
+				}
+				got = append(got, "toolResult:"+block.ToolResult.ToolUseID)
+			case block.CachePoint != nil:
+				if block.CachePoint.TTL != nil {
+					got = append(got, "cachePoint:"+*block.CachePoint.TTL)
+				} else {
+					got = append(got, "cachePoint")
+				}
+			default:
+				got = append(got, fmt.Sprintf("unexpected:%+v", block))
+			}
+		}
+		return got
+	}
 
 	cases := []struct {
 		name    string
 		results []schemas.ChatMessage
+		want    []string
 	}{
-		{name: "marker on the last tool result", results: []schemas.ChatMessage{
-			toolResult("call_1", "first", nil), toolResult("call_2", "second", ephemeral),
-		}},
-		{name: "marker on an earlier tool result", results: []schemas.ChatMessage{
-			toolResult("call_1", "first", ephemeral), toolResult("call_2", "second", nil),
-		}},
+		{
+			name: "marker on the last tool result",
+			results: []schemas.ChatMessage{
+				toolResult("call_1", "first", nil), toolResult("call_2", "second", marker("")),
+			},
+			want: []string{"toolResult:call_1", "toolResult:call_2", "cachePoint"},
+		},
+		{
+			name: "marker on an earlier tool result stays on it",
+			results: []schemas.ChatMessage{
+				toolResult("call_1", "first", marker("")), toolResult("call_2", "second", nil),
+			},
+			want: []string{"toolResult:call_1", "cachePoint", "toolResult:call_2"},
+		},
+		{
+			name: "markers with different TTLs are both kept",
+			results: []schemas.ChatMessage{
+				toolResult("call_1", "first", marker("1h")), toolResult("call_2", "second", marker("5m")),
+			},
+			want: []string{"toolResult:call_1", "cachePoint:1h", "toolResult:call_2", "cachePoint:5m"},
+		},
 	}
 
 	for _, tc := range cases {
@@ -374,22 +425,9 @@ func TestConvertToolMessages_CachePointAfterToolResults(t *testing.T) {
 				t.Fatalf("conversion failed: %v", err)
 			}
 
-			last := out.Messages[len(out.Messages)-1].Content
-			if len(last) != 3 {
-				t.Fatalf("expected [toolResult, toolResult, cachePoint], got %d blocks: %+v", len(last), last)
-			}
-			for i, block := range last[:2] {
-				if block.ToolResult == nil {
-					t.Fatalf("block %d: expected a tool result, got %+v", i, block)
-				}
-				for _, inner := range block.ToolResult.Content {
-					if inner.CachePoint != nil {
-						t.Errorf("block %d: cache point inside tool result content", i)
-					}
-				}
-			}
-			if last[2].CachePoint == nil {
-				t.Errorf("expected a cache point after the tool results, got %+v", last[2])
+			got := layout(t, out.Messages[len(out.Messages)-1].Content)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("block layout:\n got  %v\n want %v", got, tc.want)
 			}
 		})
 	}
