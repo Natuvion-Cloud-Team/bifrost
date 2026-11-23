@@ -942,10 +942,6 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 
 	for _, msg := range msgs {
 		var toolResultContent []BedrockContentBlock
-		// Bedrock accepts a cache point as its own block in the message, not inside
-		// a tool result, so it goes right after the tool result it belongs to
-		// (same placement as the Responses path).
-		var cachePoint *BedrockCachePoint
 		if msg.Content.ContentStr != nil {
 			// Bedrock expects JSON to be a parsed object, not a string
 			// Validate and compact JSON without parsing into Go types (preserves key ordering)
@@ -991,8 +987,11 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 						toolResultContent = append(toolResultContent, BedrockContentBlock{
 							Text: block.Text,
 						})
+						// Cache point must be in a separate block
 						if block.CacheControl != nil {
-							cachePoint = newBedrockCachePoint(block.CacheControl.TTL)
+							toolResultContent = append(toolResultContent, BedrockContentBlock{
+								CachePoint: newBedrockCachePoint(block.CacheControl.TTL),
+							})
 						}
 					}
 				case schemas.ChatContentBlockTypeImage:
@@ -1004,8 +1003,11 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 						toolResultContent = append(toolResultContent, BedrockContentBlock{
 							Image: imageSource,
 						})
+						// Cache point must be in a separate block
 						if block.CacheControl != nil {
-							cachePoint = newBedrockCachePoint(block.CacheControl.TTL)
+							toolResultContent = append(toolResultContent, BedrockContentBlock{
+								CachePoint: newBedrockCachePoint(block.CacheControl.TTL),
+							})
 						}
 					}
 				}
@@ -1030,9 +1032,6 @@ func convertToolMessages(ctx context.Context, msgs []schemas.ChatMessage) (Bedro
 		}
 
 		contentBlocks = append(contentBlocks, toolResultBlock)
-		if cachePoint != nil {
-			contentBlocks = append(contentBlocks, BedrockContentBlock{CachePoint: cachePoint})
-		}
 	}
 
 	bedrockMsg.Content = contentBlocks
